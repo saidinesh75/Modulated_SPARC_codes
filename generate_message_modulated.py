@@ -15,8 +15,6 @@ def gray2bin(num):
         mask = mask >> 1
     return num
 
-
-
 def bin_arr_2_int(bin_array):
     '''
     Binary array (numpy.ndarray) to integer
@@ -26,8 +24,6 @@ def bin_arr_2_int(bin_array):
     assert 0 < k < 64 # Ensures non-negative integer output
     # 1 << np.arange(k)[::-1]      generates vector like [16 8 4 2 1]
     return bin_array.dot(1 << np.arange(k)[::-1])
-
-
 
 def psk_constel(K):
     '''
@@ -44,8 +40,6 @@ def psk_constel(K):
         c     = np.cos(theta) + 1J*np.sin(theta)
 
     return c
-
-
 
 def psk_mod(bin_arr, K):
     '''
@@ -78,7 +72,6 @@ def psk_mod(bin_arr, K):
 
     return symbols
 
-
 def generate_message_modulated(code_params,rng,cols):
     
     P,R,L,M,dist,awgn_var = map(code_params.get,['P','R','L','M','dist','awgn_var'])
@@ -96,7 +89,7 @@ def generate_message_modulated(code_params,rng,cols):
         logK = int(round(np.log2(K)))
         sec_size = logM + logK
 
-    beta = np.zeros((N,cols))
+    beta = np.zeros((N,cols),dtype=complex) if K>2 else np.zeros((N,cols))
     # beta2 = np.zeros((N,cols))
 
     for i in range(cols):

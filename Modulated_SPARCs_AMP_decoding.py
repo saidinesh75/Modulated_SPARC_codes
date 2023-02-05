@@ -4,6 +4,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # BE QUIET!!!! (info and warnings are n
 
 import numpy as np 
 import matplotlib.pyplot as plt
+dir_name = "/home/saidinesh/Modulated_SPARCs/Mod_sparcs_Figures"
+plt.rcParams["savefig.directory"] = os.chdir(os.path.dirname(dir_name))
 
 import math
 import sys
@@ -21,12 +23,12 @@ from eta import eta
 from power_dist import power_dist
 from generate_message_modulated import generate_message_modulated
 from tau_calculate import tau_calculate
-from generate_mm_matrix import generate_mm_matrix
-from sparc_amp import sparc_amp
+# from generate_mm_matrix import generate_mm_matrix
+from sparc_amp_new import sparc_amp_new
 
-EbNo_dB = np.array([10])
-cols = 10
-itr = 10
+EbN0_dB = np.array([5,10,15])
+cols = 100
+itr = 1000
 def is_power_of_2(x):
         return (x > 0) and ((x & (x - 1)) == 0)  # '&' id bitwise AND operation.
 
@@ -184,23 +186,29 @@ def sc_basic(Q, omega, Lambda):
     return W
 
 # def create_base_matrix(P, power_allocated=False, spatially_coupled=False, **kwargs):
-def create_base_matrix(P, power_allocated, spatially_coupled, **kwargs):
+def create_base_matrix(code_params):
     '''
     Construct base entry/vector/matrix for Sparse Regression Codes
 
     For  power_allocated,  will need awgn_var, B, R and R_PA_ratio
     For spatially_coupled, will need omega and Lambda
     '''
+    power_allocated,spatially_coupled = map(code_params.get,['power_allocated','spatially_coupled'])
+    P,L,dist = map(code_params.get,['P','L','dist'])
+
+    assert power_allocated==True ^ spatially_coupled== True, "Only either power_allocated or spatial coupling should be true (right now)"
+
     if not power_allocated:
         Q = np.array(P) # Make into np.ndarray to use .ndim==0
-    # else:
-    #     awgn_var,B,R,R_PA_ratio = map(kwargs.get,['awgn_var','B','R','R_PA_ratio'])
-    #     Q = pa_iterative(P, awgn_var, B, R*R_PA_ratio)
+    else:
+        # dist = map(code_params.get,['dist'])   # dist = 0 for flat and 1 for exponentially decaying
+        if dist == 0:
+            Q = P*np.ones([1,L])
 
     if not spatially_coupled:
         W = Q
     else:
-        omega, Lambda = map(kwargs.get,['omega','Lambda'])
+        omega, Lambda = map(code_params.get,['omega','Lambda'])
         W = sc_basic(Q, omega, Lambda)
 
     return W
@@ -219,13 +227,16 @@ def generate_mm_matrix(W,code_params,rng):
     Mr = int(n/Lr)  # size of row block
     Mc = int(N/Lc)  # size of column block
 
-    A = np.zeros([n,N], dtype=complex)
+    A = np.zeros([n,N], dtype=complex) if K > 2 else np.zeros([n,N])
     
-    for r in range(Lr):
-        for c in range(Lc):
-            # A[int(r*Mr):int((r+1)*Mr) , int(c*Mc):int((c+1)*Mc) ]  = np.random.normal(size=(Mr, Mc), scale= W[r,c] / L).astype(np.float64)
-            A[int(r*Mr):int((r+1)*Mr) , int(c*Mc):int((c+1)*Mc) ] = np.sqrt(W[r,c]/(2*L))*(rng.randn(Mr,Mc)+1j* rng.randn(Mr,Mc))
-
+    if K > 2:
+        for r in range(Lr):
+            for c in range(Lc):
+                A[int(r*Mr):int((r+1)*Mr) , int(c*Mc):int((c+1)*Mc) ] = np.sqrt(W[r,c]/(2*L))*(rng.randn(Mr,Mc)+1j* rng.randn(Mr,Mc))
+    else:
+        for r in range(Lr):
+            for c in range(Lc):
+                A[int(r*Mr):int((r+1)*Mr) , int(c*Mc):int((c+1)*Mc) ] = np.sqrt(W[r,c]/(L))*(rng.randn(Mr,Mc))
     return A 
 
 def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
@@ -239,7 +250,7 @@ def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
         Add complex Gaussian noise. Indenpendent Gaussian noise of mean 0
         variance awgn_var/2 to each dimension.
     '''
-    y = np.zeros(np.shape(in_array))
+    y = np.zeros(np.shape(in_array), dtype="complex128") if K>2 else np.zeros(np.shape(in_array))
     for c in range(cols):
         input_array = in_array[:,c]
         assert input_array.ndim == 1, 'input array must be one-dimensional'
@@ -248,40 +259,129 @@ def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
         rng = np.random.RandomState(rand_seed)
         n   = input_array.size
 
-        if input_array.dtype == np.float:
+        if input_array.dtype == float:
             y[:,c] =  input_array + np.sqrt(awgn_var)*rng.randn(n)
 
-        elif input_array.dtype == np.complex:
-            y[:,c] =  input_array + np.sqrt(awgn_var/2)*(rng.randn(n)+1j* rng.randn(n))
+        elif input_array.dtype == complex:
+            noise = np.sqrt(awgn_var/2)*(rng.randn(n)+1j* rng.randn(n))
+            y[:,c] =  input_array + noise
 
         else:
             raise Exception("Unknown input type '{}'".format(input_array.dtype))
 
     return y        
 
-code_params   = {'P': 15.0,    # Average codeword symbol power constraint
-                    'R': 1.3,     # Rate
-                    'L': 800,    # Number of sections
-                    'M': 32,      # Columns per section
+# Demodulaion
+def msg_vector_2_bin_arr(msg_vector, M, K=1):
+    '''
+    Convert SPARC message vector to binary array (numpy.ndarray)
+
+    M: entries per section of SPARC message vector
+    K: parameter of K-PSK modulation for msg_vector (power of 2)
+       If no modulation, K=1.
+    '''
+    assert type(msg_vector) == np.ndarray
+    assert type(M)==int and M>0 and is_power_of_2(M)
+    assert msg_vector.size % M == 0
+    logM = int(round(np.log2(M)))
+    L = msg_vector.size // M
+
+    if K==1:
+        sec_size = logM
+    else:
+        assert type(K)==int and K>1 and is_power_of_2(K)
+        logK = int(round(np.log2(K)))
+        sec_size = logM + logK
+
+    msg_reshape  = msg_vector.reshape(L,M)
+    idxs1, idxs2 = np.nonzero(msg_reshape)
+    assert np.array_equal(idxs1, np.arange(L)) # Exactly 1 nonzero in each row
+
+    if K != 1:
+        vals = msg_reshape[(idxs1, idxs2)] # Pick out the nonzero values
+
+    bin_arr = np.zeros(L*sec_size, dtype='bool')
+    for l in range(L):
+        bin_arr[l*sec_size : l*sec_size+logM] = int_2_bin_arr(idxs2[l], logM)
+        if K != 1:
+            bin_arr[l*sec_size+logM : (l+1)*sec_size] = psk_demod(vals[l], K)
+
+    return bin_arr
+
+def bin2gray(num):
+    '''
+    Converts binary code (int type) to gray code (int type)
+    From https://en.wikipedia.org/wiki/Gray_code
+    '''
+    return num ^ (num >> 1)
+
+def psk_demod(symbols, K):
+    '''
+    K-PSK demodulation (using gray coding).
+
+    symbols: single symbol (float or complex) or np.ndarray of symbols.
+    K      : number of PSK contellations, K>1 and is a power of 2
+
+    Returns
+    bin_arr: Corresponding boolean numpy.ndarray after demodulation.
+             Has length L * log2(K) where L is the length of `symbols`.
+    '''
+
+    assert type(K)==int and K>1 and is_power_of_2(K)
+    L    = symbols.size           # Number of symbols to demodulate
+    c    = psk_constel(K)         # PSK constellation symbols
+    logK = int(round(np.log2(K))) # Bits per symbol
+
+    bin_arr = np.zeros(L*logK, dtype=bool)
+    if L == 1:
+        idx = bin2gray(np.argwhere(c == symbols))[0,0] # gray code index
+        assert type(idx) == np.int64, 'Wrong type(idx)={}'.format(type(idx))
+        bin_arr = int_2_bin_arr(idx, logK)
+    else:
+        for l in range(L):
+            idx = bin2gray(np.argwhere(c == symbols[l]))[0,0]
+            assert type(idx) == np.int64, 'Wrong type(idx)={}'.format(type(idx))
+            bin_arr[l*logK:(l+1)*logK] = int_2_bin_arr(idx, logK)
+
+    return bin_arr
+
+def int_2_bin_arr(integer, arr_length):
+    '''
+    Integer to binary array (numpy.ndarray) of length arr_length
+    NB: only works for non-negative integers
+    '''
+    assert integer>=0
+    return np.array(list(np.binary_repr(integer, arr_length))).astype('bool')
+
+code_params   = {'P': 1.0,    # Average codeword symbol power constraint
+                    'R': 0.5,     # Rate
+                    'L': 6,    # Number of sections
+                    'M': 128,      # Columns per section
                     'dist':0,
-                    'complex':True,
                     'modulated':True,
-                    'power_allocated':False,
-                    'spatially_coupled':True,
-                    'K':4,
-                    'omega':6,
-                    'Lambda':32,
+                    'power_allocated':True,
+                    'spatially_coupled':False,
+                    'dist':0,
+                    'K':2,
+                    'omega':3,
+                    'Lambda':7,
                     'rho':0
                     }
-                    
+
+if code_params['modulated'] and code_params['K']>2:
+    code_params.update({'complex':True})
+else:
+    code_params.update({'complex':False})
+
 decode_params = {'t_max':25 ,'rtol':1e-6}
 
-W = create_base_matrix(**code_params)
+W = create_base_matrix(code_params)
 
 # check_code_params(code_params)
+sec_err_ebno = np.zeros(np.size(EbN0_dB))
 
-for e in range(np.size(EbNo_dB)):
-    code_params['EbNo_dB']= EbNo_dB[e]
+for e in range(np.size(EbN0_dB)):
+    code_params.update({'EbNo_dB':EbN0_dB[e]})
     # check_code_params(code_params)
 
     P,R,L,M,dist = map(code_params.get,['P','R','L','M','dist'])
@@ -302,7 +402,7 @@ for e in range(np.size(EbNo_dB)):
     # It's given in the paper that w ~ CN(0,sima^2) which implies sigma^2 goes to each of real and img parts. So total N0=sigma^2.
     Eb = n*P/bit_len
     awgn_var = Eb/Eb_No_linear    # sigma^2=N0
-    sigma = np.sqrt(awgn_var)     
+    # sigma = np.sqrt(awgn_var)     
     code_params.update({'awgn_var':awgn_var})   #  =sqrt(N0)
 
     snr_rx = P/awgn_var
@@ -333,11 +433,30 @@ for e in range(np.size(EbNo_dB)):
         delim[1,i] = delim[1,i-1]+M
 
     A = generate_mm_matrix(W,code_params,rng)
-
+    num_sec_errors = np.zeros((cols,itr))
+    sec_err_rate = np.zeros((cols,itr))
+    avg_sec_err = 0
     for p in range(itr):
         beta,c = generate_message_modulated(code_params,rng,cols)
         x = np.matmul(A,beta)
         y = awgn_channel(x,awgn_var,cols,rand_seed=None)        
 
-        beta_hat = sparc_amp(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
+        beta_hat,t_final,nmse,psi = sparc_amp_new(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
+        
+        diff_beta = ~(beta_hat==beta)
+        num_sec_errors[:,p]= np.count_nonzero(diff_beta,axis=0)/2
+        sec_err_rate[:,p] = num_sec_errors[:,p]/L
+        avg_sec_err = (np.mean(sec_err_rate) + avg_sec_err)/itr
+        
+        # bits_out = msg_vector_2_bin_arr(beta, code_params['M'], K)
+    sec_err_ebno[e] = avg_sec_err  
+
+fig, ax = plt.subplots()
+ax.plot(EbN0_dB, sec_err_ebno,label='L=6')
+plt.legend(loc="upper left")
+ax.set_yscale('log')
+ax.set_title('Avg_Section_error_rate vs Eb/N0')
+ax.set_xlabel('Eb/N0')
+ax.set_ylabel('Section error rate')
+plt.savefig("Sec_err_rate_vs_Eb_No_test_L6_K2_1e6.png")
 print("done")        
