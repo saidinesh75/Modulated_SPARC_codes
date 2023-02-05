@@ -61,7 +61,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
         z = np.zeros((n),dtype=complex) if K>2 else np.zeros((n))
         phi_init = np.ones(Lr)  #initializing with 1s because it comes as a denom for tau calculation
-        beta_hat = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
+        # beta_hat = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
         beta_T = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
         v_init = np.zeros(n)
         nmse  = np.ones((t_max, Lc))
@@ -98,17 +98,17 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
             Q = generate_Q(tau_t,phi_t,n,N)  # generating Q matrix
 
             test_stat_1 = np.multiply(Q,A)
-            test_stat_2 = np.matmul(np.transpose(test_stat_1),z)
-            
-            beta_hat = eta_modulated_new(beta_hat + test_stat_2,code_params,c,tau_tilda,delim)
+            test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
+            test_stat_3 = beta_hat + test_stat_2
+            beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_tilda,delim)
             
 
             if W.ndim == 0:
                 psi       = 1 - (np.abs(beta_hat)**2).sum()/L  #magnitude of the symbols in psk =1
-                nmse[t+1] = (np.abs(beta_hat-beta)**2).sum()/L
+                nmse[t] = (np.abs(beta_hat-beta)**2).sum()/L
             else:
                 psi       = 1 - (np.abs(beta_hat)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
-                nmse[t+1] = (np.abs(beta_hat-beta)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
+                nmse[t] = (np.abs(beta_hat-beta)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
 
             if t>0 and np.allclose(psi, psi_prev, rtol, atol=atol):
                 nmse[t:] = nmse[t]
@@ -124,4 +124,3 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
         beta_final[:,i] = beta_T    
 
     return beta_final,t_final,nmse,psi
-    

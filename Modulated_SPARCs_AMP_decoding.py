@@ -4,7 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # BE QUIET!!!! (info and warnings are n
 
 import numpy as np 
 import matplotlib.pyplot as plt
-dir_name = "/home/saidinesh/Modulated_SPARCs/Mod_sparcs_Figures"
+dir_name = "/home/dinesh/Modulated_SPARC_codes/Mod_sparcs_Figures"
 plt.rcParams["savefig.directory"] = os.chdir(os.path.dirname(dir_name))
 
 import math
@@ -15,18 +15,14 @@ import numpy.matlib
 from scipy.io import loadmat
 from sklearn.preprocessing import PolynomialFeatures 
 
-
 rng = np.random.RandomState(seed=None)
 import pickle
-
-from eta import eta
-from power_dist import power_dist
 from generate_message_modulated import generate_message_modulated
-from tau_calculate import tau_calculate
+
 # from generate_mm_matrix import generate_mm_matrix
 from sparc_amp_new import sparc_amp_new
 
-EbN0_dB = np.array([5,10,15])
+EbN0_dB = np.array([0,2,5,10,15])
 cols = 100
 itr = 1000
 def is_power_of_2(x):
@@ -356,7 +352,7 @@ def int_2_bin_arr(integer, arr_length):
 code_params   = {'P': 1.0,    # Average codeword symbol power constraint
                     'R': 0.5,     # Rate
                     'L': 6,    # Number of sections
-                    'M': 128,      # Columns per section
+                    'M': 32,      # Columns per section
                     'dist':0,
                     'modulated':True,
                     'power_allocated':True,
@@ -437,6 +433,9 @@ for e in range(np.size(EbN0_dB)):
     sec_err_rate = np.zeros((cols,itr))
     avg_sec_err = 0
     for p in range(itr):
+        if p%250==0:
+            print("Running itr = {a} for Eb/N0 = {b}".format(a=p, b=EbN0_dB[e]))
+
         beta,c = generate_message_modulated(code_params,rng,cols)
         x = np.matmul(A,beta)
         y = awgn_channel(x,awgn_var,cols,rand_seed=None)        
@@ -458,5 +457,5 @@ ax.set_yscale('log')
 ax.set_title('Avg_Section_error_rate vs Eb/N0')
 ax.set_xlabel('Eb/N0')
 ax.set_ylabel('Section error rate')
-plt.savefig("Sec_err_rate_vs_Eb_No_test_L6_K2_1e6.png")
+plt.savefig("Sec_err_rate_vs_Eb_No_test_L6_K4_1e5.png")
 print("done")        
