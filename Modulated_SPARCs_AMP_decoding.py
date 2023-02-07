@@ -25,7 +25,7 @@ from sparc_amp_new import sparc_amp_new
 EbN0_dB = np.array([0,2,5,10,15])
 # EbN0_dB = np.array([1])
 cols = 100
-itr = 1000
+itr = 10000
 def is_power_of_2(x):
         return (x > 0) and ((x & (x - 1)) == 0)  # '&' id bitwise AND operation.
 
@@ -457,5 +457,5 @@ ax.set_yscale('log')
 ax.set_title('Avg_Section_error_rate vs Eb/N0')
 ax.set_xlabel('Eb/N0')
 ax.set_ylabel('Section error rate')
-plt.savefig("Sec_rr_rate_vs_EBN0_L6_K4_1e5")
+plt.savefig("Sec_rr_rate_vs_EBN0_L6_K4_1e6")
 print("done")        
