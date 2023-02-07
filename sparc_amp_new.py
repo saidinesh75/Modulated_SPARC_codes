@@ -31,11 +31,19 @@ def generate_Q(tau,phi,n,N):
     return Q
 
 def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,cols):
-    P,R,L,M,n = map( code_params.get, ['P','R','L','M','n'] )
+    P,L,M,n = map(code_params.get, ['P','L','M','n'] )
     K = code_params['K'] if code_params['modulated'] else 1
+    L=int(L)
+    M=int(M)
     N = int(L*M)
     t_max, rtol= map(decode_params.get,['t_max','rtol'])
     atol = 2*np.finfo(np.float).resolution # abs tolerance 4 early stopping
+    
+    bit_len = int(round(L*np.log2(K*M)))
+    logM = int(round(np.log2(M)))
+    sec_size = int(round(np.log2(K*M)))
+
+    R = bit_len/n  # Rate
 
     Lr = W.shape[0]               # Num of row blocks
     Mr = n // Lr                  # Entries per row block
@@ -47,8 +55,8 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
     # Codebook for length M
     codeboook = np.zeros([int(M),int(K*M)],dtype=complex) if K >2 else np.zeros([int(M),int(K*M)])
-    for m in range(M):
-        for k in range(K):
+    for m in range(int(M)):
+        for k in range(int(K)):
             codeboook[m, (m*K)+k ]=c[k] 
             
     beta_final = np.zeros([L*M,cols]) if (K==1 or K==2) else np.zeros([L*M,cols], dtype=complex)
@@ -90,7 +98,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
             ## tau calculation
             temp1 = np.transpose(W)/phi_t 
-            temp2 = (1/R)*np.matmul(temp1,np.ones(Lr))
+            temp2 = (1/Lr)*np.matmul(temp1,np.ones(Lr))
             temp3 = np.reciprocal(temp2)
             tau_t = ((R/2)/np.log(K*M)) * temp3
             tau_tilda = np.repeat(tau_t,Mc)
@@ -98,17 +106,17 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
             Q = generate_Q(tau_t,phi_t,n,N)  # generating Q matrix
 
             test_stat_1 = np.multiply(Q,A)
-            test_stat_2 = np.matmul(np.transpose(test_stat_1),z)
+            test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
             
             beta_hat = eta_modulated_new(beta_hat + test_stat_2,code_params,c,tau_tilda,delim)
             
 
             if W.ndim == 0:
                 psi       = 1 - (np.abs(beta_hat)**2).sum()/L  #magnitude of the symbols in psk =1
-                nmse[t+1] = (np.abs(beta_hat-beta)**2).sum()/L
+                nmse[t] = (np.abs(beta_hat-beta)**2).sum()/L
             else:
                 psi       = 1 - (np.abs(beta_hat)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
-                nmse[t+1] = (np.abs(beta_hat-beta)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
+                nmse[t] = (np.abs(beta_hat-beta)**2).reshape(Lc,-1).sum(axis=1)/(L/Lc)
 
             if t>0 and np.allclose(psi, psi_prev, rtol, atol=atol):
                 nmse[t:] = nmse[t]

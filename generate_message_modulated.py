@@ -114,7 +114,7 @@ def generate_message_modulated(code_params,rng,cols):
                 bits_mod_sec = bits_in[l*sec_size+logM : (l+1)*sec_size] #logK bits used for selection of PSK symbol for the non-zero location
                 val = psk_mod(bits_mod_sec, K)
 
-            beta0[l*M + idx] = val      # will make a 1 at the decimal equivalent in the l-th section
+            beta0[l*int(M) + idx] = val      # will make a 1 at the decimal equivalent in the l-th section
         
         beta[:,i] = beta0
 
