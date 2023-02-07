@@ -31,11 +31,19 @@ def generate_Q(tau,phi,n,N):
     return Q
 
 def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,cols):
-    P,R,L,M,n = map( code_params.get, ['P','R','L','M','n'] )
+    P,L,M,n = map(code_params.get, ['P','L','M','n'] )
     K = code_params['K'] if code_params['modulated'] else 1
+    L=int(L)
+    M=int(M)
     N = int(L*M)
     t_max, rtol= map(decode_params.get,['t_max','rtol'])
     atol = 2*np.finfo(np.float).resolution # abs tolerance 4 early stopping
+    
+    bit_len = int(round(L*np.log2(K*M)))
+    logM = int(round(np.log2(M)))
+    sec_size = int(round(np.log2(K*M)))
+
+    R = bit_len/n  # Rate
 
     Lr = W.shape[0]               # Num of row blocks
     Mr = n // Lr                  # Entries per row block
@@ -47,8 +55,8 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
     # Codebook for length M
     codeboook = np.zeros([int(M),int(K*M)],dtype=complex) if K >2 else np.zeros([int(M),int(K*M)])
-    for m in range(M):
-        for k in range(K):
+    for m in range(int(M)):
+        for k in range(int(K)):
             codeboook[m, (m*K)+k ]=c[k] 
             
     beta_final = np.zeros([L*M,cols]) if (K==1 or K==2) else np.zeros([L*M,cols], dtype=complex)
@@ -90,7 +98,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
             ## tau calculation
             temp1 = np.transpose(W)/phi_t 
-            temp2 = (1/R)*np.matmul(temp1,np.ones(Lr))
+            temp2 = (1/Lr)*np.matmul(temp1,np.ones(Lr))
             temp3 = np.reciprocal(temp2)
             tau_t = ((R/2)/np.log(K*M)) * temp3
             tau_tilda = np.repeat(tau_t,Mc)
@@ -99,8 +107,13 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
             test_stat_1 = np.multiply(Q,A)
             test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
+<<<<<<< HEAD
             test_stat_3 = beta_hat + test_stat_2
             beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_tilda,delim)
+=======
+            
+            beta_hat = eta_modulated_new(beta_hat + test_stat_2,code_params,c,tau_tilda,delim)
+>>>>>>> 5195257dd1de5801637f632e69dbe6e7d060350e
             
 
             if W.ndim == 0:

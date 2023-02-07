@@ -353,7 +353,11 @@ def int_2_bin_arr(integer, arr_length):
 code_params   = {'P': 1.0,    # Average codeword symbol power constraint
                     'R': 0.5,     # Rate
                     'L': 6,    # Number of sections
+<<<<<<< HEAD
                     'M': 32,      # Columns per section
+=======
+                    'M': 64,      # Columns per section
+>>>>>>> 5195257dd1de5801637f632e69dbe6e7d060350e
                     'dist':0,
                     'modulated':True,
                     'power_allocated':True,
@@ -451,11 +455,15 @@ for e in range(np.size(EbN0_dB)):
     sec_err_ebno[e] = sec_err/itr  
 
 fig, ax = plt.subplots()
-ax.plot(EbN0_dB, sec_err_ebno,label='L=6')
+ax.plot(EbN0_dB, sec_err_ebno,label='L=6,R=0.5')
 plt.legend(loc="upper left")
 ax.set_yscale('log')
 ax.set_title('Avg_Section_error_rate vs Eb/N0')
 ax.set_xlabel('Eb/N0')
 ax.set_ylabel('Section error rate')
+<<<<<<< HEAD
 plt.savefig("Sec_rr_rate_vs_EBN0_L6_K4_1e6")
+=======
+plt.savefig("Sec_rr_rate_vs_EBN0_L6_K2_1e5")
+>>>>>>> 5195257dd1de5801637f632e69dbe6e7d060350e
 print("done")        
