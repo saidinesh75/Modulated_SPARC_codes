@@ -20,7 +20,7 @@ import pickle
 from generate_msg_mod_modified import generate_msg_mod_modified
 
 # from generate_mm_matrix import generate_mm_matrix
-from sparc_amp_new import sparc_amp_new
+from amp_demod import amp_demod
 
 def is_power_of_2(x):
         return (x > 0) and ((x & (x - 1)) == 0)  # '&' id bitwise AND operation.
@@ -157,8 +157,8 @@ def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
 
     return y   
 
-cols = 100
-itr = 100
+cols = 10
+itr = 10
 
 data=loadmat("/home/dinesh/Modulated_SPARC_codes/MUB_2_6.mat")
 A = np.array(data['B'])
@@ -167,10 +167,10 @@ N = n**2
 A_unitnorm = A[:,:N]
 
 
-sections = np.array([4,8])               # Number of Sections
+sections = np.array([1])               # Number of Sections
              # Number of Columns per section
 
-EbN0_dB = np.array([5,10,15])
+EbN0_dB = np.array([0,5,8])
 P = 1
 
 sec_err_ebno = np.zeros([np.size(sections),np.size(EbN0_dB)])
@@ -248,7 +248,7 @@ for l in range(np.size(sections)):
             x = np.matmul(A,beta)
             y = awgn_channel(x,awgn_var,cols,rand_seed=None)        
 
-            beta_hat,t_final,nmse,psi = sparc_amp_new(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
+            beta_hat,t_final,nmse,psi = amp_demod(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
 
             diff_beta = ~(beta_hat==beta)
             num_sec_errors[:,p]= (np.count_nonzero(diff_beta,axis=0)/2)
