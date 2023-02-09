@@ -71,7 +71,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
         phi_init = np.ones(Lr)  #initializing with 1s because it comes as a denom for tau calculation
         # beta_hat = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
         beta_T = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
-        v_init = np.zeros(n)
+        v_init = np.zeros((n),dtype=complex) if K>2 else np.zeros((n))
         nmse  = np.ones((t_max, Lc))
 
         for t in range(t_max):
@@ -80,7 +80,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
             ## gamma calculation
             for p in range(Lc):
                 beta_c = beta_hat[p*Mc: (p+1)*Mc]
-                beta_c_coeffs[p] = (1 - (np.linalg.norm(beta_c,axis=0)**2/(L/Lc)) )  
+                beta_c_coeffs[p] = (1 - ( np.linalg.norm(beta_c)**2/(L/Lc) ) )  
             gamma = (1/Lc)*np.dot(W,beta_c_coeffs)
 
             # phi calculation (There is no psi in online parameter calculation)
@@ -97,7 +97,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
             z = y - np.matmul(A,beta_hat) + np.multiply(v_tilda,z)
 
             ## tau calculation
-            temp1 = np.transpose(W)/phi_t 
+            temp1 = np.divide(np.transpose(W),phi_t) 
             temp2 = (1/Lr)*np.matmul(temp1,np.ones(Lr))
             temp3 = np.reciprocal(temp2)
             tau_t = ((R/2)/np.log(K*M)) * temp3
@@ -107,13 +107,8 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
 
             test_stat_1 = np.multiply(Q,A)
             test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
-<<<<<<< HEAD
             test_stat_3 = beta_hat + test_stat_2
             beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_tilda,delim)
-=======
-            
-            beta_hat = eta_modulated_new(beta_hat + test_stat_2,code_params,c,tau_tilda,delim)
->>>>>>> 5195257dd1de5801637f632e69dbe6e7d060350e
             
 
             if W.ndim == 0:

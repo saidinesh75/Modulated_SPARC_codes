@@ -4,7 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # BE QUIET!!!! (info and warnings are n
 
 import numpy as np 
 import matplotlib.pyplot as plt
-dir_name = "/home/saidinesh/Modulated_SPARCs/Mod_sparcs_Figures"
+dir_name = "/home/dinesh/Modulated_SPARC_codes/Mod_sparcs_Figures/"
 plt.rcParams["savefig.directory"] = os.chdir(os.path.dirname(dir_name))
 
 import math
@@ -17,7 +17,7 @@ from sklearn.preprocessing import PolynomialFeatures
 
 rng = np.random.RandomState(seed=None)
 import pickle
-from generate_message_modulated import generate_message_modulated
+from generate_msg_mod_modified import generate_msg_mod_modified
 
 # from generate_mm_matrix import generate_mm_matrix
 from sparc_amp_new import sparc_amp_new
@@ -25,14 +25,15 @@ from sparc_amp_new import sparc_amp_new
 def is_power_of_2(x):
         return (x > 0) and ((x & (x - 1)) == 0)  # '&' id bitwise AND operation.
 
+'''
 def bin_arr_2_msg_vector(bin_arr, M, K=1):
-    '''
+    #begin comment
     Convert binary array (numpy.ndarray) to SPARC message vector
 
     M: entries per section of SPARC message vector
     K: parameter of K-PSK modulation for msg_vector (power of 2)
        If no modulation, K=1.
-    '''
+    #end comment
     assert type(M)==int and M>0 and is_power_of_2(M)
     logM = int(round(np.log2(M)))
     if K==1: # unmodulated case
@@ -60,6 +61,7 @@ def bin_arr_2_msg_vector(bin_arr, M, K=1):
         msg_vector[l*M + idx] = val      # will make a 1 at the decimal equivalent in the l-th section
 
     return msg_vector
+'''
 
 def sc_basic(Q, omega, Lambda):
     '''
@@ -104,16 +106,16 @@ def create_base_matrix(code_params):
     For spatially_coupled, will need omega and Lambda
     '''
     power_allocated,spatially_coupled = map(code_params.get,['power_allocated','spatially_coupled'])
-    P,L,dist = map(code_params.get,['P','L','dist'])
+    P,L,dist,n = map(code_params.get,['P','L','dist','n'])
 
     assert power_allocated==True ^ spatially_coupled== True, "Only either power_allocated or spatial coupling should be true (right now)"
 
-    if not power_allocated:
-        Q = np.array(P) # Make into np.ndarray to use .ndim==0
+    if power_allocated:
+        Q = np.array(P).reshape([1,1]) # Make into np.ndarray to use .ndim==0
     else:
         # dist = map(code_params.get,['dist'])   # dist = 0 for flat and 1 for exponentially decaying
         if dist == 0:
-            Q = P*np.ones([1,L])
+            Q = (P)*np.ones([1,L]) 
 
     if not spatially_coupled:
         W = Q
@@ -155,22 +157,20 @@ def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
 
     return y   
 
-# EbN0_dB = np.array([0,5,10,15])
-# EbN0_dB = np.array([1])
 cols = 100
 itr = 100
 
-data=loadmat("/home/saidinesh/Dinesh_SPARC_codes_2/MUB_2_6.mat")
-A = np.array(data['B']).astype(np.float64)
+data=loadmat("/home/dinesh/Modulated_SPARC_codes/MUB_2_6.mat")
+A = np.array(data['B'])
 n,_ = np.shape(A)  # (64*4160)
-A = A[:,:(n**2)]
 N = n**2
+A_unitnorm = A[:,:N]
+
 
 sections = np.array([4,8])               # Number of Sections
              # Number of Columns per section
 
 EbN0_dB = np.array([5,10,15])
-
 P = 1
 
 sec_err_ebno = np.zeros([np.size(sections),np.size(EbN0_dB)])
@@ -181,6 +181,7 @@ for l in range(np.size(sections)):
 
     L = sections[l]
     M = N/L
+    A = np.sqrt(P/L)*A_unitnorm  #so power of each col = (nP)/L => E[||Ab||^2] = nP
     code_params   = {'P': P,    # Average codeword symbol power constraint
                     'n': n,     # Rate
                     'L': L,    # Number of sections
@@ -190,29 +191,33 @@ for l in range(np.size(sections)):
                     'power_allocated':True,
                     'spatially_coupled':False,
                     'dist':0,
-                    'K':2,
+                    'K':4,
                     }
 
-    W = create_base_matrix(code_params)
+    W = create_base_matrix(code_params)  # Is this required?
+
+    delim = np.zeros([2,L])
+    delim[0,0] = 0
+    delim[1,0] = M-1
+
+    for i in range(1,L):
+        delim[0,i] = delim[1,i-1]+1
+        delim[1,i] = delim[1,i-1]+M
 
     for e in range(np.size(EbN0_dB)):
         code_params.update({'EbNo_dB':EbN0_dB[e]})
         print("Running for L = {l} and Eb/N0 = {e}".format(l=sections[l], e=EbN0_dB[e]))
-        
+        K = code_params['K'] if code_params['modulated'] else 1
+
         if code_params['modulated'] and code_params['K']>2:
             code_params.update({'complex':True})
         else:
             code_params.update({'complex':False})
         
         decode_params = {'t_max':25 ,'rtol':1e-6}
-
-        code_params_list = ['P','L','M','EbNo_dB','dist','n']
-        P,L,M,Eb_No,dist,n = map(code_params.get, code_params_list)
-        K = code_params['K'] if code_params['modulated'] else 1
-        # Parameters calculation and offline computation of tau's
-
+        Eb_No,dist = map(code_params.get, ['EbNo_dB','dist'])
         Eb_No_linear = np.power(10, np.divide(Eb_No,10))
-        N = int(L*M)
+        # N = int(L*M)
 
         bit_len = int(round(L*np.log2(K*M)))
         logM = int(round(np.log2(M)))
@@ -232,29 +237,21 @@ for l in range(np.size(sections)):
         R_actual = bit_len / n      # Actual rate
         code_params.update({'n':n, 'R_actual':R_actual})
 
-        delim = np.zeros([2,L])
-        delim[0,0] = 0
-        delim[1,0] = M-1
-
-        for i in range(1,L):
-            delim[0,i] = delim[1,i-1]+1
-            delim[1,i] = delim[1,i-1]+M
-
         num_sec_errors = np.zeros((cols,itr))
         sec_err_rate = np.zeros((cols,itr))
         sec_err = 0
 
         for p in range(itr):
-            # if p%250==0:
-                # print("Running itr = {a} for Eb/N0 = {b}".format(a=p, b=EbN0_dB[e]))
-            beta,c = generate_message_modulated(code_params,rng,cols)
+            if p%5==0:
+                print("Running itr = {a} ".format(a=p))
+            beta,c = generate_msg_mod_modified(code_params,rng,cols)
             x = np.matmul(A,beta)
             y = awgn_channel(x,awgn_var,cols,rand_seed=None)        
 
             beta_hat,t_final,nmse,psi = sparc_amp_new(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
 
             diff_beta = ~(beta_hat==beta)
-            num_sec_errors[:,p]= np.count_nonzero(diff_beta,axis=0)/2
+            num_sec_errors[:,p]= (np.count_nonzero(diff_beta,axis=0)/2)
             sec_err_rate[:,p] = num_sec_errors[:,p]/L
             sec_err = np.mean(sec_err_rate[:,p]) + sec_err
         sec_err_ebno[l,e] = sec_err/itr
@@ -268,8 +265,6 @@ ax.set_yscale('log')
 ax.set_title('Avg_Section_error_rate vs Eb/N0')
 ax.set_xlabel('Eb/N0')
 ax.set_ylabel('Section error rate')  
-plt.savefig("Sec_err_rate_vs_Eb_No5to15_MUB26_L48.png")
-
-          
+plt.savefig("Sec_err_rate_vs_EbN0_L48_K4_1e4.png")
 
 print("Done")
