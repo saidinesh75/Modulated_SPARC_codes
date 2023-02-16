@@ -125,7 +125,7 @@ def create_base_matrix(code_params):
 
     return W
 
-def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
+def awgn_channel(in_array, awgn_var, cols,K,rand_seed=None):
     '''
     Adds Gaussian noise to input array
 
@@ -145,10 +145,10 @@ def awgn_channel(in_array, awgn_var, cols,rand_seed=None,):
         rng = np.random.RandomState(rand_seed)
         n   = input_array.size
 
-        if input_array.dtype == float:
+        if K<=2:
             y[:,c] =  input_array + np.sqrt(awgn_var)*rng.randn(n)
 
-        elif input_array.dtype == complex:
+        elif K>2:
             noise = np.sqrt(awgn_var/2)*(rng.randn(n)+1j* rng.randn(n))
             y[:,c] =  input_array + noise
 
@@ -166,21 +166,18 @@ n,_ = np.shape(A)  # (64*4160)
 N = n**2
 A_unitnorm = A[:,:N]
 
-
-sections = np.array([1])               # Number of Sections
+sections = np.array([4])               # Number of Sections
              # Number of Columns per section
 
-EbN0_dB = np.array([0,5,8])
-P = 1
+EbN0_dB = np.array([0,2,4])
 
 sec_err_ebno = np.zeros([np.size(sections),np.size(EbN0_dB)])
 block_err_ebno = np.zeros([np.size(sections),np.size(EbN0_dB)])
 
-
 for l in range(np.size(sections)):
-
     L = sections[l]
-    M = N/L
+    M = int(N/L)
+    P = L/n   
     A = np.sqrt(P/L)*A_unitnorm  #so power of each col = (nP)/L => E[||Ab||^2] = nP
     code_params   = {'P': P,    # Average codeword symbol power constraint
                     'n': n,     # Rate
@@ -191,7 +188,7 @@ for l in range(np.size(sections)):
                     'power_allocated':True,
                     'spatially_coupled':False,
                     'dist':0,
-                    'K':4,
+                    'K':2,
                     }
 
     W = create_base_matrix(code_params)  # Is this required?
@@ -215,13 +212,13 @@ for l in range(np.size(sections)):
             code_params.update({'complex':False})
         
         decode_params = {'t_max':25 ,'rtol':1e-6}
-        Eb_No,dist = map(code_params.get, ['EbNo_dB','dist'])
-        Eb_No_linear = np.power(10, np.divide(Eb_No,10))
+        Eb_No_linear = np.power(10, np.divide(EbN0_dB[e],10))
         # N = int(L*M)
 
         bit_len = int(round(L*np.log2(K*M)))
         logM = int(round(np.log2(M)))
-        sec_size = int(round(np.log2(K*M)))
+        logK = int(round(np.log2(K)))
+        sec_size = logM + logK
 
         R = bit_len/n  # Rate
         Eb = n*P/bit_len
@@ -245,8 +242,9 @@ for l in range(np.size(sections)):
             if p%5==0:
                 print("Running itr = {a} ".format(a=p))
             beta,c = generate_msg_mod_modified(code_params,rng,cols)
+            np.savetxt("/home/dinesh/Modulated_SPARC_codes/debug_csv_files/beta.csv", beta, delimiter=",", fmt="%.2f")
             x = np.matmul(A,beta)
-            y = awgn_channel(x,awgn_var,cols,rand_seed=None)        
+            y = awgn_channel(x,awgn_var,cols,K,rand_seed=None)        
 
             beta_hat,t_final,nmse,psi = amp_demod(y, beta, A, W, c, code_params, decode_params,rng,delim,cols)
 

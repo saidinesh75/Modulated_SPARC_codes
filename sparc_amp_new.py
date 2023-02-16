@@ -100,7 +100,7 @@ def sparc_amp_new(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,c
             temp1 = np.divide(np.transpose(W),phi_t) 
             temp2 = (1/Lr)*np.matmul(temp1,np.ones(Lr))
             temp3 = np.reciprocal(temp2)
-            tau_t = ((R/2)/np.log(K*M)) * temp3
+            tau_t = ((R/2)/np.log2(K*M)) * temp3
             tau_tilda = np.repeat(tau_t,Mc)
 
             Q = generate_Q(tau_t,phi_t,n,N)  # generating Q matrix

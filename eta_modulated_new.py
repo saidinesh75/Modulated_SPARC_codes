@@ -3,7 +3,7 @@ import numpy as np
 def eta_modulated_new(beta_hat,code_params,c,tau_tilda,delim):
     K = code_params['K'] if code_params['modulated'] else 1
     beta_th = np.zeros(np.shape(beta_hat),dtype=complex) if K>2 else np.zeros(np.shape(beta_hat))
-    P,R,L,M,dist = map(code_params.get,['P','R','L','M','dist'])
+    P,L,M,dist = map(code_params.get,['P','L','M','dist'])
     s1 = beta_hat
         
     for j in range(L):
@@ -11,7 +11,7 @@ def eta_modulated_new(beta_hat,code_params,c,tau_tilda,delim):
         beta_th_section = np.zeros(int(M),dtype=complex) if K>2 else np.zeros(int(M))
         exp_param = np.zeros([K,int(M)]) if K>2 else np.zeros([K,int(M)])
         for k in range(K):
-            new_exp_param = np.real(((beta_section.conj())*c[k]))/tau_tilda[j]
+            new_exp_param = np.real(((beta_section.conj())*c[k]))/tau_tilda[j]  
             max_exp_param = np.max(new_exp_param)
             max_minus_term = 0
             if max_exp_param>308:

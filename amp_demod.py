@@ -41,6 +41,10 @@ def amp_demod(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,cols)
     Mr = n // Lr                  # Entries per row block
     Lc    = W.shape[-1]               # Num of column blocks
     Mc    = (L*M) // Lc                 # Entries per column block
+    W_params = {'Lr':Lr,
+                'Lc':Lc,
+                'Mr':Mr,
+                'Mc':Mc}
 
     # gamma = np.dot(W, np.ones(Lc))/Lc # Residual var - noise var (length Lr)  -> this is gamma at t=0
     nmse  = np.ones((t_max, Lc))      # NMSE of each column block
@@ -57,47 +61,52 @@ def amp_demod(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,cols)
         y = y_cols[:,i]
         beta = beta_cols[:,i]
 
-        beta_hat = np.zeros(L*M) if (K==1 or K==2) else np.zeros(L*M, dtype=complex)
-
         ## Initializations
+        beta_hat = np.zeros(L*M) if (K==1 or K==2) else np.zeros(L*M, dtype=complex)
         z = np.zeros((n),dtype=complex) if K>2 else np.zeros((n))
         beta_T = np.zeros(N,dtype=complex) if K>2 else np.zeros(N)
-        v_tilda = np.zeros((n),dtype=complex) if K>2 else np.zeros((n))
+        v_init = np.zeros((n),dtype=complex) if K>2 else np.zeros((n))
         nmse  = np.ones((t_max, Lc))
-        phi_t = np.zeros((Lr),dtype=complex) if K>2 else np.zeros((n))
+        phi_t = np.zeros((Lr),dtype=complex) if K>2 else np.zeros((Lr))  # might not be needed
+
         for t in range(t_max):
             beta_c_coeffs = np.zeros(Lc,dtype=complex) if K>2 else np.zeros(Lc)
 
-            z = y - np.matmul(A,beta_hat) + np.multiply(v_tilda,z)
-
-            ## gamma calculation
-            for p in range(Lc):
-                beta_c = beta_hat[p*Mc: (p+1)*Mc]
-                beta_c_coeffs[p] = (1 - ( np.linalg.norm(beta_c)**2/(L/Lc) ) )  
-            gamma = (1/Lc)*np.dot(W,beta_c_coeffs)
-
-            if t>0:
+            if t==0:
+                gamma_t = W
+                v_tilda = v_init  # should be a single constant or have the same value(if we are using it as hadamard multiplication)
+            else:
+                for p in range(Lc):
+                    beta_c = beta_hat[p*Mc: (p+1)*Mc]
+                    beta_c_coeffs[p] = (1 - ( np.linalg.norm(beta_c)**2/(L/Lc) ) )  
+                gamma = (1/Lc)*np.dot(W,beta_c_coeffs)
                 v = np.divide(gamma,phi_t)
                 v_tilda = np.repeat(v,Mr)
                 psi_prev = np.copy(psi)
 
+            # Residual step
+            z = y - np.matmul(A,beta_hat) + np.multiply(v_tilda,z)
+
+            # phi calculation
             for x in range(Lr):
-                    phi_t[x] = (np.linalg.norm(z[x*Mr : (x+1)*Mr],axis=0)**2) / (n/R)
+                phi_t[x] = (np.linalg.norm(z[x*Mr : (x+1)*Mr],axis=0)**2) / (n/Lr)
 
             ## tau calculation
-            # tau_t = phi_t/2 ; 
-            temp1 = np.divide(np.transpose(W),phi_t)
-            temp2 = np.matmul(temp1,np.ones(Lr))/Lr
+            temp1 = np.divide(np.transpose(W),phi_t) 
+            temp2 = (1/Lr)*np.matmul(temp1,np.ones(Lr))
             temp3 = np.reciprocal(temp2)
             tau_t = ((R/2)/np.log2(K*M)) * temp3
-            tau_tilda = np.repeat(tau_t,Mc) 
+            tau_tilda = np.repeat(tau_t,Mc)
 
-            Q = generate_Q(tau_t,phi_t,n,N)
+            # generating Q matrix
+            Q = generate_Q(tau_t,phi_t,n,N)  
 
+            # Test statistic
             test_stat_1 = np.multiply(Q,A)
             test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
             test_stat_3 = beta_hat + test_stat_2
-            beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_tilda,delim)
+            beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_t,delim,W_params)
+            np.savetxt("/home/dinesh/Modulated_SPARC_codes/debug_csv_files/beta_hat.csv", beta_hat, delimiter=",", fmt="%.4e")
 
             if W.ndim == 0:
                 psi       = 1 - (np.abs(beta_hat)**2).sum()/L  #magnitude of the symbols in psk =1
