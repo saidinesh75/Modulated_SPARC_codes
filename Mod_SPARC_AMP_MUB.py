@@ -4,7 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # BE QUIET!!!! (info and warnings are n
 
 import numpy as np 
 import matplotlib.pyplot as plt
-dir_name = "/home/dinesh/Modulated_SPARC_codes/Mod_sparcs_Figures/"
+dir_name = "/home/saidinesh/Modulated_SPARCs/Mod_sparcs_Figures/"
 plt.rcParams["savefig.directory"] = os.chdir(os.path.dirname(dir_name))
 
 import math
@@ -157,16 +157,16 @@ def awgn_channel(in_array, awgn_var, cols,K,rand_seed=None):
 
     return y   
 
-cols = 10
-itr = 10
+cols = 100
+itr = 100
 
-data=loadmat("/home/dinesh/Modulated_SPARC_codes/MUB_2_6.mat")
+data=loadmat("/home/saidinesh/Modulated_SPARCs/MUB_2_6.mat")
 A = np.array(data['B'])
 n,_ = np.shape(A)  # (64*4160)
 N = n**2
 A_unitnorm = A[:,:N]
 
-sections = np.array([4])               # Number of Sections
+sections = np.array([4,8])               # Number of Sections
              # Number of Columns per section
 
 EbN0_dB = np.array([0,2,4])
@@ -239,10 +239,10 @@ for l in range(np.size(sections)):
         sec_err = 0
 
         for p in range(itr):
-            if p%5==0:
+            if p%25==0:
                 print("Running itr = {a} ".format(a=p))
             beta,c = generate_msg_mod_modified(code_params,rng,cols)
-            np.savetxt("/home/dinesh/Modulated_SPARC_codes/debug_csv_files/beta.csv", beta, delimiter=",", fmt="%.2f")
+            np.savetxt("/home/saidinesh/Modulated_SPARCs/debug_csv_files/beta.csv", beta, delimiter=",", fmt="%.2f")
             x = np.matmul(A,beta)
             y = awgn_channel(x,awgn_var,cols,K,rand_seed=None)        
 

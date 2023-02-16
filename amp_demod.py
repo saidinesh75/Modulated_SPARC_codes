@@ -99,14 +99,15 @@ def amp_demod(y_cols,beta_cols, A,W,c,code_params, decode_params,rng,delim,cols)
             tau_tilda = np.repeat(tau_t,Mc)
 
             # generating Q matrix
-            Q = generate_Q(tau_t,phi_t,n,N)  
+            # Q = generate_Q(tau_t,phi_t,n,N)  
 
             # Test statistic
-            test_stat_1 = np.multiply(Q,A)
+            # test_stat_1 = np.multiply(Q,A)
+            test_stat_1 = A
             test_stat_2 = np.matmul(np.transpose(test_stat_1).conj(),z)
             test_stat_3 = beta_hat + test_stat_2
             beta_hat = eta_modulated_new(test_stat_3,code_params,c,tau_t,delim,W_params)
-            np.savetxt("/home/dinesh/Modulated_SPARC_codes/debug_csv_files/beta_hat.csv", beta_hat, delimiter=",", fmt="%.4e")
+            np.savetxt("/home/saidinesh/Modulated_SPARCs/debug_csv_files/beta_hat.csv", beta_hat, delimiter=",", fmt="%.4e")
 
             if W.ndim == 0:
                 psi       = 1 - (np.abs(beta_hat)**2).sum()/L  #magnitude of the symbols in psk =1
