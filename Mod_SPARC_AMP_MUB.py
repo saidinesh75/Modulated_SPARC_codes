@@ -146,7 +146,7 @@ def awgn_channel(in_array, awgn_var, cols,K,rand_seed=None):
         n   = input_array.size
 
         if K<=2:
-            y[:,c] =  input_array + np.sqrt(awgn_var)*rng.randn(n)
+            y[:,c] =  input_array + np.sqrt(awgn_var/2)*rng.randn(n)
 
         elif K>2:
             noise = np.sqrt(awgn_var/2)*(rng.randn(n)+1j* rng.randn(n))
@@ -178,7 +178,7 @@ for l in range(np.size(sections)):
     L = sections[l]
     M = int(N/L)
     P = L/n   
-    A = np.sqrt(P/L)*A_unitnorm  #so power of each col = (nP)/L => E[||Ab||^2] = nP
+    A = np.sqrt(n*P/L)*A_unitnorm  #so power of each col = (nP)/L => E[||Ab||^2] = nP
     code_params   = {'P': P,    # Average codeword symbol power constraint
                     'n': n,     # Rate
                     'L': L,    # Number of sections
@@ -188,7 +188,7 @@ for l in range(np.size(sections)):
                     'power_allocated':True,
                     'spatially_coupled':False,
                     'dist':0,
-                    'K':2,
+                    'K':4,
                     }
 
     W = create_base_matrix(code_params)  # Is this required?
